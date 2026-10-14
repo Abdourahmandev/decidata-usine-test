@@ -1,8 +1,14 @@
 """Calcul des taxes de vente du Quebec (TPS et TVQ).
 
-Ce module fournit la fonction :func:`calculer_taxes`, qui calcule la TPS
-(5 %) et la TVQ (9,975 %) sur un montant hors taxes, avec un arrondi
-commercial (Decimal, ROUND_HALF_UP) a deux decimales.
+Ce module fournit deux fonctions :
+
+- :func:`calculer_taxes`, qui calcule la TPS (5 %) et la TVQ (9,975 %)
+  sur un montant hors taxes ;
+- :func:`calculer_ht_depuis_ttc`, qui retrouve le montant hors taxes a
+  partir d'un montant toutes taxes comprises.
+
+Les montants sont calcules en Decimal et arrondis au cent (2 decimales)
+avec l'arrondi commercial (ROUND_HALF_UP).
 
 Les montants acceptes sont les nombres entiers (int), les nombres a
 virgule flottante (float) et les Decimal. Tout autre type, de meme que
@@ -17,10 +23,13 @@ __all__ = [
     "MontantInvalideError",
     "MontantNonNumeriqueError",
     "calculer_taxes",
+    "calculer_ht_depuis_ttc",
 ]
 
 TAUX_TPS = Decimal("0.05")
 TAUX_TVQ = Decimal("0.09975")
+
+_FACTEUR_TTC = Decimal("1") + TAUX_TPS + TAUX_TVQ  # 1,14975
 
 _DEUX_DECIMALES = Decimal("0.01")
 
@@ -98,3 +107,36 @@ def calculer_taxes(montant_ht):
         "tvq": tvq,
         "ttc": ttc,
     }
+
+
+def calculer_ht_depuis_ttc(montant_ttc):
+    """Retrouve le montant hors taxes a partir d'un montant TTC.
+
+    Le montant hors taxes est d'abord calcule en divisant le montant TTC
+    par le facteur combine TPS + TVQ (1,14975), puis arrondi au cent
+    (ROUND_HALF_UP). La TPS et la TVQ sont ensuite recalculees sur ce
+    montant avec :func:`calculer_taxes`.
+
+    Si, a cause des arrondis, la somme ``ht + tps + tvq`` differe du
+    montant TTC d'un cent, le montant hors taxes est corrige d'un cent
+    pour que le total retrouve exactement le montant TTC fourni.
+
+    Retourne le meme dictionnaire ``{"ht", "tps", "tvq", "ttc"}`` que
+    :func:`calculer_taxes`, avec des :class:`Decimal` arrondis au cent.
+
+    Leve les memes erreurs que :func:`calculer_taxes` :
+    :class:`MontantInvalideError` si le montant est negatif, et
+    :class:`MontantNonNumeriqueError` (sous-classe de :class:`ValueError`)
+    si le montant n'est pas numerique.
+    """
+    montant = _arrondir(_valider_montant(montant_ttc))
+    ht = _arrondir(montant / _FACTEUR_TTC)
+    resultat = calculer_taxes(ht)
+    somme = resultat["ht"] + resultat["tps"] + resultat["tvq"]
+    if somme != montant:
+        if somme < montant:
+            ht = ht + _DEUX_DECIMALES
+        else:
+            ht = ht - _DEUX_DECIMALES
+        resultat = calculer_taxes(ht)
+    return resultat
