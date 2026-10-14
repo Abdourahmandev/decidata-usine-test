@@ -19,20 +19,26 @@ cent superieur (ex. `9,975 $` devient `9,98 $`).
 
 ```python
 from decimal import Decimal
-from taxes_quebec import calculer_tps, calculer_tvq, calculer_total
+from taxes_quebec import calculer_taxes
 
-montant = Decimal("100")
-
-calculer_tps(montant)    # Decimal('5.00')
-calculer_tvq(montant)    # Decimal('9.98')
-calculer_total(montant)  # Decimal('114.98')
+calculer_taxes(Decimal("100"))
+# {
+#     "ht": Decimal("100.00"),
+#     "tps": Decimal("5.00"),
+#     "tvq": Decimal("9.98"),
+#     "ttc": Decimal("114.98"),
+# }
 ```
+
+`calculer_taxes` retourne un dictionnaire dont les valeurs sont des
+`Decimal` arrondis au cent : `ht` (montant hors taxes), `tps`, `tvq` et
+`ttc` (total = montant + TPS + TVQ).
 
 ### Erreurs
 
 - `MontantInvalideError` (sous-classe de `ValueError`) : montant negatif.
-- `TypeMontantInvalideError` (sous-classe de `TypeError`) : montant non
-  numerique (ex. chaine de caracteres, liste, `None`).
+- `MontantNonNumeriqueError` (sous-classe de `ValueError`) : montant non
+  numerique (ex. chaine de caracteres, liste, `None`, booleen).
 
 Les montants acceptes sont `int`, `float` et `Decimal`.
 
@@ -40,5 +46,5 @@ Les montants acceptes sont `int`, `float` et `Decimal`.
 
 ```bash
 pip install pytest
-pytest -v
+python -m pytest -v
 ```

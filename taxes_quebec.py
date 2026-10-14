@@ -1,24 +1,22 @@
 """Calcul des taxes de vente du Quebec (TPS et TVQ).
 
-Ce module fournit des fonctions de calcul de la TPS (5 %) et de la TVQ
-(9,975 %) sur un montant hors taxes, avec un arrondi commercial
-(Decimal, ROUND_HALF_UP) a deux decimales.
+Ce module fournit la fonction :func:`calculer_taxes`, qui calcule la TPS
+(5 %) et la TVQ (9,975 %) sur un montant hors taxes, avec un arrondi
+commercial (Decimal, ROUND_HALF_UP) a deux decimales.
 
 Les montants acceptes sont les nombres entiers (int), les nombres a
 virgule flottante (float) et les Decimal. Tout autre type, de meme que
 tout montant negatif, leve une erreur explicite.
 """
 
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, ROUND_HALF_UP
 
 __all__ = [
     "TAUX_TPS",
     "TAUX_TVQ",
     "MontantInvalideError",
-    "TypeMontantInvalideError",
-    "calculer_tps",
-    "calculer_tvq",
-    "calculer_total",
+    "MontantNonNumeriqueError",
+    "calculer_taxes",
 ]
 
 TAUX_TPS = Decimal("0.05")
@@ -31,17 +29,17 @@ class MontantInvalideError(ValueError):
     """Levee lorsqu'un montant hors taxes est negatif."""
 
 
-class TypeMontantInvalideError(TypeError):
+class MontantNonNumeriqueError(ValueError):
     """Levee lorsqu'un montant hors taxes n'est pas un nombre."""
 
 
 def _vers_decimal(montant):
     """Convertit un montant valide en Decimal.
 
-    Leve :class:`TypeMontantInvalideError` si le type n'est pas numerique.
+    Leve :class:`MontantNonNumeriqueError` si le type n'est pas numerique.
     """
     if isinstance(montant, bool):
-        raise TypeMontantInvalideError(
+        raise MontantNonNumeriqueError(
             "Montant invalide : un booleen n'est pas un montant."
         )
     if isinstance(montant, Decimal):
@@ -50,7 +48,7 @@ def _vers_decimal(montant):
         return Decimal(montant)
     if isinstance(montant, float):
         return Decimal(str(montant))
-    raise TypeMontantInvalideError(
+    raise MontantNonNumeriqueError(
         "Montant invalide : type %r non numerique." % type(montant).__name__
     )
 
@@ -73,19 +71,30 @@ def _arrondir(valeur):
     return valeur.quantize(_DEUX_DECIMALES, rounding=ROUND_HALF_UP)
 
 
-def calculer_tps(montant_ht):
-    """Retourne la TPS (5 %) arrondie au cent sur le montant hors taxes."""
-    return _arrondir(_valider_montant(montant_ht) * TAUX_TPS)
+def calculer_taxes(montant_ht):
+    """Calcule la TPS, la TVQ et le total sur un montant hors taxes.
 
+    Retourne un dictionnaire dont les valeurs sont des :class:`Decimal`
+    arrondis au cent avec l'arrondi commercial (ROUND_HALF_UP) :
 
-def calculer_tvq(montant_ht):
-    """Retourne la TVQ (9,975 %) arrondie au cent sur le montant hors taxes."""
-    return _arrondir(_valider_montant(montant_ht) * TAUX_TVQ)
+        {
+            "ht":  montant hors taxes arrondi au cent,
+            "tps": TPS (5 %) arrondie au cent,
+            "tvq": TVQ (9,975 %) arrondie au cent,
+            "ttc": montant + TPS + TVQ, arrondi au cent,
+        }
 
-
-def calculer_total(montant_ht):
-    """Retourne le total (montant + TPS + TVQ) arrondi au cent."""
-    montant = _valider_montant(montant_ht)
+    Leve :class:`MontantInvalideError` si le montant est negatif, et
+    :class:`MontantNonNumeriqueError` (sous-classe de :class:`ValueError`)
+    si le montant n'est pas numerique.
+    """
+    montant = _arrondir(_valider_montant(montant_ht))
     tps = _arrondir(montant * TAUX_TPS)
     tvq = _arrondir(montant * TAUX_TVQ)
-    return _arrondir(montant + tps + tvq)
+    ttc = _arrondir(montant + tps + tvq)
+    return {
+        "ht": montant,
+        "tps": tps,
+        "tvq": tvq,
+        "ttc": ttc,
+    }
